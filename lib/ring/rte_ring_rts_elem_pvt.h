@@ -37,9 +37,56 @@ __rte_ring_rts_update_tail(struct rte_ring_rts_headtail *ht)
 		/* on 32-bit systems we have to do atomic read here */
 		h.raw = rte_atomic_load_explicit(&ht->head.raw, rte_memory_order_relaxed);
 
-		nt.raw = ot.raw;
-		if (++nt.val.cnt == h.val.cnt)
+		/*
+		 * The following logic addresses a potential deadlock scenario in RTS (Relaxed Tail Sync).
+		 *
+		 * Potential Deadlock:
+		 * A deadlock can occur if the tail's update counter (ht->tail.val.cnt)
+		 * catches up to the head's update counter (ht->head.val.cnt),
+		 * i.e., ht->tail.val.cnt == ht->head.val.cnt, but the tail's position
+		 * (ht->tail.val.pos) is still behind the head's position (ht->head.val.pos).
+		 * This means ht->tail.val.pos < ht->head.val.pos.
+		 *
+		 * How the old code perpetuated the deadlock:
+		 * In the previous logic, if tail.cnt == head.cnt, tail.cnt would be incremented.
+		 * However, the condition `++nt.val.cnt == h.val.cnt` would then become false
+		 * (e.g., if old tail.cnt was N and head.cnt was N, new tail.cnt is N+1,
+		 * so N+1 == N is false).
+		 * As a result, nt.val.pos (tail position) would not be updated to h.val.pos (head position).
+		 * The tail position would remain stale, and the ring would appear empty or have fewer
+		 * elements than it actually does, leading to a functional deadlock where consumers
+		 * cannot see new items.
+		 *
+		 * How the new code fixes it:
+		 * The new logic ensures that the tail position (nt.val.pos) is updated to
+		 * the head position (h.val.pos) whenever the original tail count (original_ot_cnt)
+		 * is less than or equal to the head count (h.val.cnt).
+		 * This covers two cases:
+		 * 1. Normal operation (original_ot_cnt < h.val.cnt): Tail is catching up,
+		 *    its position should align with the head's position once its count matches.
+		 * 2. Deadlock condition (original_ot_cnt == h.val.cnt and ot.val.pos < h.val.pos):
+		 *    By setting nt.val.pos = h.val.pos, the stale tail position is corrected,
+		 *    resolving the deadlock.
+		 * The tail count (nt.val.cnt) is always incremented to signify an update attempt.
+		 * An anomalous case where original_ot_cnt > h.val.cnt is also handled defensively
+		 * by not changing nt.val.pos from ot.val.pos in that scenario.
+		 */
+		nt.raw = ot.raw; // nt starts with the original tail value
+		uint32_t original_ot_cnt = ot.val.cnt; // Save original tail count
+
+		// New tail count will always be one greater than the original tail count
+		nt.val.cnt = original_ot_cnt + 1;
+
+		// If the original tail count was not ahead of the observed head count,
+		// then the new tail position should align with the observed head position.
+		// This corrects the deadlock state (tail.cnt == head.cnt but tail.pos < head.pos)
+		// and handles the normal case (tail.cnt < head.cnt).
+		if (original_ot_cnt <= h.val.cnt) {
 			nt.val.pos = h.val.pos;
+		}
+		// If original_ot_cnt > h.val.cnt (tail somehow got ahead in count), 
+		// then nt.val.pos remains ot.val.pos (from the initial nt.raw = ot.raw). 
+		// This case is anomalous but the logic handles it defensively.
 
 	} while (rte_atomic_compare_exchange_strong_explicit(&ht->tail.raw,
 			(uint64_t *)(uintptr_t)&ot.raw, nt.raw,
