@@ -10,6 +10,8 @@
 #ifndef _RTE_RING_RTS_ELEM_PVT_H_
 #define _RTE_RING_RTS_ELEM_PVT_H_
 
+#include "rte_ring_rts_trace_pvt.h"
+
 /**
  * @file rte_ring_rts_elem_pvt.h
  * It is not recommended to include this file directly,
@@ -36,6 +38,12 @@ __rte_ring_rts_update_tail(struct rte_ring_rts_headtail *ht)
 	do {
 		/* on 32-bit systems we have to do atomic read here */
 		h.raw = rte_atomic_load_explicit(&ht->head.raw, rte_memory_order_relaxed);
+
+		/* TRACEPOINT CALL 1: At the beginning of the loop */
+		rte_ring_trace_rts_update_tail_event(0, /* trace_point_id: loop entry */
+						 ot.val.cnt, ot.val.pos,
+						 h.val.cnt, h.val.pos,
+						 ot.val.cnt, ot.val.pos); /* Using ot for nt here */
 
 		/*
 		 * The following logic addresses a potential deadlock scenario in RTS (Relaxed Tail Sync).
@@ -87,6 +95,12 @@ __rte_ring_rts_update_tail(struct rte_ring_rts_headtail *ht)
 		// If original_ot_cnt > h.val.cnt (tail somehow got ahead in count), 
 		// then nt.val.pos remains ot.val.pos (from the initial nt.raw = ot.raw). 
 		// This case is anomalous but the logic handles it defensively.
+
+		/* TRACEPOINT CALL 2: Before the CAS operation */
+		rte_ring_trace_rts_update_tail_event(1, /* trace_point_id: before CAS */
+						 ot.val.cnt, ot.val.pos,
+						 h.val.cnt, h.val.pos,
+						 nt.val.cnt, nt.val.pos);
 
 	} while (rte_atomic_compare_exchange_strong_explicit(&ht->tail.raw,
 			(uint64_t *)(uintptr_t)&ot.raw, nt.raw,

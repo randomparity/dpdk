@@ -15,6 +15,9 @@
 #include <errno.h>
 #include <sys/queue.h>
 
+#include <rte_trace_point_register.h>
+#include "rte_ring_rts_trace_pvt.h"
+
 #include <eal_export.h>
 #include <rte_common.h>
 #include <rte_log.h>
@@ -28,6 +31,11 @@
 
 #include "rte_ring.h"
 #include "rte_ring_elem.h"
+
+RTE_TRACE_POINT_REGISTER(
+	rte_ring_trace_rts_update_tail_event,
+	librte.ring.rts_update_tail_event
+)
 
 RTE_LOG_REGISTER_DEFAULT(ring_logtype, INFO);
 #define RTE_LOGTYPE_RING ring_logtype
