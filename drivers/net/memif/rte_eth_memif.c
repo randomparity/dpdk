@@ -841,7 +841,12 @@ next_in_chain1:
 			n_tx_pkts++;
 		}
 free_mbufs:
-		rte_pktmbuf_free_bulk(buf_tmp, n_tx_pkts);
+		/* Fast path: all mbufs are single-segment, same pool,
+		 * refcnt=1. Return to pool directly, skipping per-mbuf
+		 * prefree checks (pool verified above, nb_segs==1 verified
+		 * in the 2x unrolled loop or scalar loop).
+		 */
+		rte_mempool_put_bulk(mp, (void **)buf_tmp, n_tx_pkts);
 	} else {
 		while (n_tx_pkts < nb_pkts && n_free) {
 			mbuf_head = *bufs++;
