@@ -268,7 +268,7 @@ memif_free_stored_mbufs(struct pmd_process_private *proc_private, struct memif_q
 	 */
 	cur_tail = rte_atomic_load_explicit(&ring->tail, rte_memory_order_acquire);
 
-#define MEMIF_FREE_BATCH 32
+#define MEMIF_FREE_BATCH 64
 	void *batch[MEMIF_FREE_BATCH];
 	uint16_t count = 0;
 
