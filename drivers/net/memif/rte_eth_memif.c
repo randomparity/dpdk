@@ -811,6 +811,29 @@ eth_memif_tx(void *queue, struct rte_mbuf **bufs, uint16_t nb_pkts)
 	uint16_t mbuf_size = rte_pktmbuf_data_room_size(mp) - RTE_PKTMBUF_HEADROOM;
 	if (i == nb_pkts && pmd->cfg.pkt_buffer_size >= mbuf_size) {
 		buf_tmp = bufs;
+
+		/* Single-segment fast path: no chain walk, no saved_slot */
+		while (n_tx_pkts < nb_pkts && n_free) {
+			mbuf_head = *bufs;
+			if (unlikely(mbuf_head->nb_segs != 1))
+				break;
+
+			d0 = &ring->desc[slot & mask];
+			d0->flags = 0;
+			cp_len = rte_pktmbuf_data_len(mbuf_head);
+
+			rte_memcpy((uint8_t *)memif_get_buffer(proc_private, d0),
+				rte_pktmbuf_mtod(mbuf_head, void *), cp_len);
+
+			d0->length = cp_len;
+			tx_bytes += cp_len;
+			bufs++;
+			slot++;
+			n_free--;
+			n_tx_pkts++;
+		}
+
+		/* Multi-segment fallback */
 		while (n_tx_pkts < nb_pkts && n_free) {
 			mbuf_head = *bufs++;
 			nb_segs = mbuf_head->nb_segs;
