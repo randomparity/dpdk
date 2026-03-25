@@ -686,19 +686,22 @@ refill:
 			(n_slots + (head & mask) - ring_size) * sizeof(struct rte_mbuf *));
 	}
 
-	while (n_slots--) {
-		s0 = head++ & mask;
-		if (n_slots > 0)
-			rte_prefetch0(mq->buffers[head & mask]);
-		d0 = &ring->desc[s0];
-		/* store buffer header */
-		mbuf = mq->buffers[s0];
-		/* populate descriptor */
-		d0->length = rte_pktmbuf_data_room_size(mq->mempool) -
-				RTE_PKTMBUF_HEADROOM;
-		d0->region = 1;
-		d0->offset = rte_pktmbuf_mtod(mbuf, uint8_t *) -
-			(uint8_t *)proc_private->regions[d0->region]->addr;
+	{
+		uint16_t desc_len = rte_pktmbuf_data_room_size(mq->mempool) -
+					RTE_PKTMBUF_HEADROOM;
+		uint8_t *reg_addr = (uint8_t *)proc_private->regions[1]->addr;
+
+		while (n_slots--) {
+			s0 = head++ & mask;
+			if (n_slots > 0)
+				rte_prefetch0(mq->buffers[head & mask]);
+			d0 = &ring->desc[s0];
+			mbuf = mq->buffers[s0];
+			d0->length = desc_len;
+			d0->region = 1;
+			d0->offset = rte_pktmbuf_mtod(mbuf, uint8_t *)
+					- reg_addr;
+		}
 	}
 no_free_mbufs:
 	/* The ring->head acts as a guard variable between Tx and Rx
