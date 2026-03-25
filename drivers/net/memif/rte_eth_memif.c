@@ -904,7 +904,7 @@ no_free_slots:
 static int
 memif_tx_one_zc(struct pmd_process_private *proc_private, struct memif_queue *mq,
 		memif_ring_t *ring, struct rte_mbuf *mbuf, const uint16_t mask,
-		uint16_t slot, uint16_t n_free)
+		uint16_t slot, uint16_t n_free, uint64_t *bytes)
 {
 	memif_desc_t *d0;
 	uint16_t nb_segs = mbuf->nb_segs;
@@ -916,7 +916,7 @@ next_in_chain:
 	/* populate descriptor */
 	d0 = &ring->desc[slot & mask];
 	d0->length = rte_pktmbuf_data_len(mbuf);
-	mq->n_bytes += rte_pktmbuf_data_len(mbuf);
+	*bytes += rte_pktmbuf_data_len(mbuf);
 	/* FIXME: get region index */
 	d0->region = 1;
 	d0->offset = rte_pktmbuf_mtod(mbuf, uint8_t *) -
@@ -949,6 +949,7 @@ eth_memif_tx_zc(void *queue, struct rte_mbuf **bufs, uint16_t nb_pkts)
 		rte_eth_devices[mq->in_port].process_private;
 	memif_ring_t *ring = memif_get_ring_from_queue(proc_private, mq);
 	uint16_t slot, n_free, ring_size, mask, n_tx_pkts = 0;
+	uint64_t n_bytes = 0;
 	struct rte_eth_link link;
 
 	if (unlikely((pmd->flags & ETH_MEMIF_FLAG_CONNECTED) == 0))
@@ -991,7 +992,7 @@ eth_memif_tx_zc(void *queue, struct rte_mbuf **bufs, uint16_t nb_pkts)
 				rte_prefetch0(*bufs + 7);
 			}
 			used_slots = memif_tx_one_zc(proc_private, mq, ring, *bufs++,
-				mask, slot, n_free);
+				mask, slot, n_free, &n_bytes);
 			if (unlikely(used_slots < 1))
 				goto no_free_slots;
 			n_tx_pkts++;
@@ -999,7 +1000,7 @@ eth_memif_tx_zc(void *queue, struct rte_mbuf **bufs, uint16_t nb_pkts)
 			n_free -= used_slots;
 
 			used_slots = memif_tx_one_zc(proc_private, mq, ring, *bufs++,
-				mask, slot, n_free);
+				mask, slot, n_free, &n_bytes);
 			if (unlikely(used_slots < 1))
 				goto no_free_slots;
 			n_tx_pkts++;
@@ -1007,7 +1008,7 @@ eth_memif_tx_zc(void *queue, struct rte_mbuf **bufs, uint16_t nb_pkts)
 			n_free -= used_slots;
 
 			used_slots = memif_tx_one_zc(proc_private, mq, ring, *bufs++,
-				mask, slot, n_free);
+				mask, slot, n_free, &n_bytes);
 			if (unlikely(used_slots < 1))
 				goto no_free_slots;
 			n_tx_pkts++;
@@ -1015,7 +1016,7 @@ eth_memif_tx_zc(void *queue, struct rte_mbuf **bufs, uint16_t nb_pkts)
 			n_free -= used_slots;
 
 			used_slots = memif_tx_one_zc(proc_private, mq, ring, *bufs++,
-				mask, slot, n_free);
+				mask, slot, n_free, &n_bytes);
 			if (unlikely(used_slots < 1))
 				goto no_free_slots;
 			n_tx_pkts++;
@@ -1023,7 +1024,7 @@ eth_memif_tx_zc(void *queue, struct rte_mbuf **bufs, uint16_t nb_pkts)
 			n_free -= used_slots;
 		}
 		used_slots = memif_tx_one_zc(proc_private, mq, ring, *bufs++,
-			mask, slot, n_free);
+			mask, slot, n_free, &n_bytes);
 		if (unlikely(used_slots < 1))
 			goto no_free_slots;
 		n_tx_pkts++;
@@ -1054,6 +1055,7 @@ no_free_slots:
 	}
 
 	/* increment queue counters */
+	mq->n_bytes += n_bytes;
 	mq->n_pkts += n_tx_pkts;
 
 	return n_tx_pkts;
