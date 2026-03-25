@@ -251,7 +251,10 @@ memif_get_buffer(struct pmd_process_private *proc_private, memif_desc_t *d)
 	return ((uint8_t *)proc_private->regions[d->region]->addr + d->offset);
 }
 
-/* Free mbufs received by server in small batches */
+/* Free mbufs received by server in small batches.
+ * All mbufs are single-segment from the same ZC mempool,
+ * so we bypass rte_pktmbuf_free_bulk and return directly to the pool.
+ */
 static void
 memif_free_stored_mbufs(struct pmd_process_private *proc_private, struct memif_queue *mq)
 {
@@ -266,19 +269,22 @@ memif_free_stored_mbufs(struct pmd_process_private *proc_private, struct memif_q
 	cur_tail = rte_atomic_load_explicit(&ring->tail, rte_memory_order_acquire);
 
 #define MEMIF_FREE_BATCH 32
-	struct rte_mbuf *batch[MEMIF_FREE_BATCH];
+	void *batch[MEMIF_FREE_BATCH];
 	uint16_t count = 0;
 
 	while (mq->last_tail != cur_tail) {
 		batch[count++] = mq->buffers[mq->last_tail & mask];
 		mq->last_tail++;
 		if (count == MEMIF_FREE_BATCH) {
-			rte_pktmbuf_free_bulk(batch, MEMIF_FREE_BATCH);
+			rte_mempool_put_bulk(
+				((struct rte_mbuf *)batch[0])->pool,
+				batch, MEMIF_FREE_BATCH);
 			count = 0;
 		}
 	}
 	if (count > 0)
-		rte_pktmbuf_free_bulk(batch, count);
+		rte_mempool_put_bulk(
+			((struct rte_mbuf *)batch[0])->pool, batch, count);
 #undef MEMIF_FREE_BATCH
 }
 
