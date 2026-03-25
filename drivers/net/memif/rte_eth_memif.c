@@ -311,6 +311,7 @@ eth_memif_rx(void *queue, struct rte_mbuf **bufs, uint16_t nb_pkts)
 	uint64_t b;
 	ssize_t size __rte_unused;
 	uint16_t head;
+	uint64_t n_bytes = 0;
 	int ret;
 	struct rte_eth_link link;
 
@@ -399,7 +400,7 @@ next_slot1:
 				goto next_slot1;
 			}
 
-			mq->n_bytes += rte_pktmbuf_pkt_len(mbuf_head);
+			n_bytes += rte_pktmbuf_pkt_len(mbuf_head);
 			*bufs++ = mbuf_head;
 			rx_pkts++;
 			n_rx_pkts++;
@@ -470,7 +471,7 @@ next_slot2:
 			if (d0->flags & MEMIF_DESC_FLAG_NEXT)
 				goto next_slot2;
 
-			mq->n_bytes += rte_pktmbuf_pkt_len(mbuf_head);
+			n_bytes += rte_pktmbuf_pkt_len(mbuf_head);
 			*bufs++ = mbuf_head;
 			n_rx_pkts++;
 		}
@@ -501,6 +502,7 @@ refill:
 		rte_atomic_store_explicit(&ring->head, head, rte_memory_order_release);
 	}
 
+	mq->n_bytes += n_bytes;
 	mq->n_pkts += n_rx_pkts;
 	return n_rx_pkts;
 }
@@ -654,6 +656,7 @@ eth_memif_tx(void *queue, struct rte_mbuf **bufs, uint16_t nb_pkts)
 	struct rte_mbuf *mbuf;
 	struct rte_mbuf *mbuf_head;
 	uint64_t a;
+	uint64_t tx_bytes = 0;
 	ssize_t size;
 	struct rte_eth_link link;
 
@@ -724,7 +727,7 @@ next_in_chain1:
 				rte_pktmbuf_mtod(mbuf, void *), cp_len);
 
 			d0->length = cp_len;
-			mq->n_bytes += cp_len;
+			tx_bytes += cp_len;
 			slot++;
 			n_free--;
 
@@ -783,7 +786,7 @@ next_in_chain2:
 					rte_pktmbuf_mtod_offset(mbuf, void *, src_off),
 					cp_len);
 
-				mq->n_bytes += cp_len;
+				tx_bytes += cp_len;
 				src_off += cp_len;
 				dst_off += cp_len;
 				src_len -= cp_len;
@@ -821,6 +824,7 @@ no_free_slots:
 		}
 	}
 
+	mq->n_bytes += tx_bytes;
 	mq->n_pkts += n_tx_pkts;
 	return n_tx_pkts;
 }
