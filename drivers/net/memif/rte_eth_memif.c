@@ -251,7 +251,7 @@ memif_get_buffer(struct pmd_process_private *proc_private, memif_desc_t *d)
 	return ((uint8_t *)proc_private->regions[d->region]->addr + d->offset);
 }
 
-/* Free mbufs received by server */
+/* Free mbufs received by server in small batches */
 static void
 memif_free_stored_mbufs(struct pmd_process_private *proc_private, struct memif_queue *mq)
 {
@@ -259,17 +259,27 @@ memif_free_stored_mbufs(struct pmd_process_private *proc_private, struct memif_q
 	uint16_t mask = (1 << mq->log2_ring_size) - 1;
 	memif_ring_t *ring = memif_get_ring_from_queue(proc_private, mq);
 
-	/* FIXME: improve performance */
 	/* The ring->tail acts as a guard variable between Tx and Rx
 	 * threads, so using load-acquire pairs with store-release
 	 * in function eth_memif_rx for C2S queues.
 	 */
 	cur_tail = rte_atomic_load_explicit(&ring->tail, rte_memory_order_acquire);
+
+#define MEMIF_FREE_BATCH 32
+	struct rte_mbuf *batch[MEMIF_FREE_BATCH];
+	uint16_t count = 0;
+
 	while (mq->last_tail != cur_tail) {
-		RTE_MBUF_PREFETCH_TO_FREE(mq->buffers[(mq->last_tail + 1) & mask]);
-		rte_pktmbuf_free_seg(mq->buffers[mq->last_tail & mask]);
+		batch[count++] = mq->buffers[mq->last_tail & mask];
 		mq->last_tail++;
+		if (count == MEMIF_FREE_BATCH) {
+			rte_pktmbuf_free_bulk(batch, MEMIF_FREE_BATCH);
+			count = 0;
+		}
 	}
+	if (count > 0)
+		rte_pktmbuf_free_bulk(batch, count);
+#undef MEMIF_FREE_BATCH
 }
 
 static int
