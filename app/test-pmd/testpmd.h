@@ -80,7 +80,7 @@ struct cmdline_file_info {
 #define MAX_PKT_BURST 512
 #define DEF_PKT_BURST 32
 
-#define DEF_MBUF_CACHE 250
+#define DEF_MBUF_CACHE 512
 
 #define RTE_CACHE_LINE_SIZE_ROUNDUP(size) \
 	(RTE_CACHE_LINE_SIZE * ((size + RTE_CACHE_LINE_SIZE - 1) / RTE_CACHE_LINE_SIZE))
