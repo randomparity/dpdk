@@ -720,8 +720,6 @@ refill:
 
 		while (n_slots--) {
 			s0 = head++ & mask;
-			if (n_slots > 0)
-				rte_prefetch0(mq->buffers[head & mask]);
 			d0 = &ring->desc[s0];
 			mbuf = mq->buffers[s0];
 			d0->length = desc_len;
