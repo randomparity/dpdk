@@ -590,6 +590,7 @@ eth_memif_rx_zc(void *queue, struct rte_mbuf **bufs, uint16_t nb_pkts)
 	memif_desc_t *d0;
 	struct rte_mbuf *mbuf, *mbuf_tail;
 	struct rte_mbuf *mbuf_head = NULL;
+	uint64_t n_bytes = 0;
 	int ret;
 	struct rte_eth_link link;
 
@@ -642,7 +643,7 @@ next_slot:
 		rte_pktmbuf_data_len(mbuf) = d0->length;
 		rte_pktmbuf_pkt_len(mbuf) = rte_pktmbuf_data_len(mbuf);
 
-		mq->n_bytes += rte_pktmbuf_data_len(mbuf);
+		n_bytes += rte_pktmbuf_data_len(mbuf);
 
 		cur_slot++;
 		n_slots--;
@@ -706,6 +707,7 @@ no_free_mbufs:
 	 */
 	rte_atomic_store_explicit(&ring->head, head, rte_memory_order_release);
 
+	mq->n_bytes += n_bytes;
 	mq->n_pkts += n_rx_pkts;
 
 	return n_rx_pkts;
