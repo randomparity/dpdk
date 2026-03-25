@@ -564,10 +564,21 @@ refill:
 		head = rte_atomic_load_explicit(&ring->head, rte_memory_order_relaxed);
 		n_slots = ring_size - head + mq->last_tail;
 
-		while (n_slots--) {
-			s0 = head++ & mask;
-			d0 = &ring->desc[s0];
-			d0->length = pmd->run.pkt_buffer_size;
+		{
+			uint32_t buf_size = pmd->run.pkt_buffer_size;
+
+			while (n_slots >= 4) {
+				ring->desc[head & mask].length = buf_size;
+				ring->desc[(head + 1) & mask].length = buf_size;
+				ring->desc[(head + 2) & mask].length = buf_size;
+				ring->desc[(head + 3) & mask].length = buf_size;
+				head += 4;
+				n_slots -= 4;
+			}
+			while (n_slots--) {
+				ring->desc[head & mask].length = buf_size;
+				head++;
+			}
 		}
 		rte_atomic_store_explicit(&ring->head, head, rte_memory_order_release);
 	}
