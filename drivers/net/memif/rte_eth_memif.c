@@ -359,6 +359,76 @@ next_bulk:
 			goto no_free_bufs;
 
 		rx_pkts = 0;
+
+		/* 4-at-a-time fast path for single-segment packets */
+		while (n_slots >= 4 && pkts - rx_pkts >= 4) {
+			memif_desc_t *d1, *d2, *d3;
+			uint16_t s1, s2, s3;
+			uint16_t len0, len1, len2, len3;
+			struct rte_mbuf *m0, *m1, *m2, *m3;
+
+			s0 = cur_slot & mask;
+			s1 = (cur_slot + 1) & mask;
+			s2 = (cur_slot + 2) & mask;
+			s3 = (cur_slot + 3) & mask;
+
+			d0 = &ring->desc[s0];
+			d1 = &ring->desc[s1];
+			d2 = &ring->desc[s2];
+			d3 = &ring->desc[s3];
+
+			/* bail to scalar if any descriptor is chained */
+			if (unlikely((d0->flags | d1->flags |
+				      d2->flags | d3->flags) &
+				     MEMIF_DESC_FLAG_NEXT))
+				break;
+
+			len0 = d0->length;
+			len1 = d1->length;
+			len2 = d2->length;
+			len3 = d3->length;
+
+			m0 = mbufs[rx_pkts + 0];
+			m1 = mbufs[rx_pkts + 1];
+			m2 = mbufs[rx_pkts + 2];
+			m3 = mbufs[rx_pkts + 3];
+
+			m0->port = mq->in_port;
+			m1->port = mq->in_port;
+			m2->port = mq->in_port;
+			m3->port = mq->in_port;
+
+			rte_pktmbuf_data_len(m0) = len0;
+			rte_pktmbuf_pkt_len(m0) = len0;
+			rte_pktmbuf_data_len(m1) = len1;
+			rte_pktmbuf_pkt_len(m1) = len1;
+			rte_pktmbuf_data_len(m2) = len2;
+			rte_pktmbuf_pkt_len(m2) = len2;
+			rte_pktmbuf_data_len(m3) = len3;
+			rte_pktmbuf_pkt_len(m3) = len3;
+
+			rte_memcpy(rte_pktmbuf_mtod(m0, void *),
+				memif_get_buffer(proc_private, d0), len0);
+			rte_memcpy(rte_pktmbuf_mtod(m1, void *),
+				memif_get_buffer(proc_private, d1), len1);
+			rte_memcpy(rte_pktmbuf_mtod(m2, void *),
+				memif_get_buffer(proc_private, d2), len2);
+			rte_memcpy(rte_pktmbuf_mtod(m3, void *),
+				memif_get_buffer(proc_private, d3), len3);
+
+			n_bytes += len0 + len1 + len2 + len3;
+			bufs[0] = m0;
+			bufs[1] = m1;
+			bufs[2] = m2;
+			bufs[3] = m3;
+			bufs += 4;
+			rx_pkts += 4;
+			n_rx_pkts += 4;
+			cur_slot += 4;
+			n_slots -= 4;
+		}
+
+		/* scalar fallback for remaining packets and chained buffers */
 		while (n_slots && rx_pkts < pkts) {
 			mbuf_head = mbufs[rx_pkts];
 			mbuf = mbuf_head;
