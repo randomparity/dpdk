@@ -349,12 +349,15 @@ eth_memif_rx(void *queue, struct rte_mbuf **bufs, uint16_t nb_pkts)
 	if (likely(mbuf_size >= pmd->cfg.pkt_buffer_size)) {
 		struct rte_mbuf *mbufs[MAX_PKT_BURST];
 next_bulk:
-		ret = rte_pktmbuf_alloc_bulk(mq->mempool, mbufs, MAX_PKT_BURST);
+		/* Allocate only as many mbufs as we can use */
+		pkts = RTE_MIN(RTE_MIN(n_slots, nb_pkts), (uint16_t)MAX_PKT_BURST);
+		if (unlikely(pkts == 0))
+			goto no_free_bufs;
+		ret = rte_pktmbuf_alloc_bulk(mq->mempool, mbufs, pkts);
 		if (unlikely(ret < 0))
 			goto no_free_bufs;
 
 		rx_pkts = 0;
-		pkts = nb_pkts < MAX_PKT_BURST ? nb_pkts : MAX_PKT_BURST;
 		while (n_slots && rx_pkts < pkts) {
 			mbuf_head = mbufs[rx_pkts];
 			mbuf = mbuf_head;
@@ -382,7 +385,7 @@ next_slot1:
 				mbuf = rte_pktmbuf_alloc(mq->mempool);
 				if (unlikely(mbuf == NULL)) {
 					rte_pktmbuf_free_bulk(mbufs + rx_pkts,
-							MAX_PKT_BURST - rx_pkts);
+							pkts - rx_pkts);
 					goto no_free_bufs;
 				}
 				ret = memif_pktmbuf_chain(mbuf_head, mbuf_tail, mbuf);
@@ -390,7 +393,7 @@ next_slot1:
 					MIF_LOG(ERR, "number-of-segments-overflow");
 					rte_pktmbuf_free(mbuf);
 					rte_pktmbuf_free_bulk(mbufs + rx_pkts,
-							MAX_PKT_BURST - rx_pkts);
+							pkts - rx_pkts);
 					goto no_free_bufs;
 				}
 				goto next_slot1;
@@ -402,11 +405,11 @@ next_slot1:
 			n_rx_pkts++;
 		}
 
-		if (rx_pkts < MAX_PKT_BURST) {
-			rte_pktmbuf_free_bulk(mbufs + rx_pkts, MAX_PKT_BURST - rx_pkts);
+		if (rx_pkts < pkts) {
+			rte_pktmbuf_free_bulk(mbufs + rx_pkts, pkts - rx_pkts);
 		} else {
 			nb_pkts -= rx_pkts;
-			if (nb_pkts)
+			if (nb_pkts && n_slots)
 				goto next_bulk;
 		}
 	} else {
