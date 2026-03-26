@@ -812,7 +812,58 @@ eth_memif_tx(void *queue, struct rte_mbuf **bufs, uint16_t nb_pkts)
 	if (i == nb_pkts && pmd->cfg.pkt_buffer_size >= mbuf_size) {
 		buf_tmp = bufs;
 
-		/* Single-segment fast path: no chain walk, no saved_slot */
+		/* 4-at-a-time TX fast path for single-segment packets */
+		while (nb_pkts - n_tx_pkts >= 4 && n_free >= 4) {
+			struct rte_mbuf *m0, *m1, *m2, *m3;
+			memif_desc_t *d1, *d2, *d3;
+			uint16_t len0, len1, len2, len3;
+
+			m0 = bufs[0];
+			m1 = bufs[1];
+			m2 = bufs[2];
+			m3 = bufs[3];
+
+			if (unlikely((m0->nb_segs | m1->nb_segs |
+				      m2->nb_segs | m3->nb_segs) != 1))
+				break;
+
+			d0 = &ring->desc[slot & mask];
+			d1 = &ring->desc[(slot + 1) & mask];
+			d2 = &ring->desc[(slot + 2) & mask];
+			d3 = &ring->desc[(slot + 3) & mask];
+
+			d0->flags = 0;
+			d1->flags = 0;
+			d2->flags = 0;
+			d3->flags = 0;
+
+			len0 = rte_pktmbuf_data_len(m0);
+			len1 = rte_pktmbuf_data_len(m1);
+			len2 = rte_pktmbuf_data_len(m2);
+			len3 = rte_pktmbuf_data_len(m3);
+
+			rte_memcpy((uint8_t *)memif_get_buffer(proc_private, d0),
+				rte_pktmbuf_mtod(m0, void *), len0);
+			rte_memcpy((uint8_t *)memif_get_buffer(proc_private, d1),
+				rte_pktmbuf_mtod(m1, void *), len1);
+			rte_memcpy((uint8_t *)memif_get_buffer(proc_private, d2),
+				rte_pktmbuf_mtod(m2, void *), len2);
+			rte_memcpy((uint8_t *)memif_get_buffer(proc_private, d3),
+				rte_pktmbuf_mtod(m3, void *), len3);
+
+			d0->length = len0;
+			d1->length = len1;
+			d2->length = len2;
+			d3->length = len3;
+
+			tx_bytes += len0 + len1 + len2 + len3;
+			bufs += 4;
+			slot += 4;
+			n_free -= 4;
+			n_tx_pkts += 4;
+		}
+
+		/* Scalar TX fallback for single-segment packets */
 		while (n_tx_pkts < nb_pkts && n_free) {
 			mbuf_head = *bufs;
 			if (unlikely(mbuf_head->nb_segs != 1))
