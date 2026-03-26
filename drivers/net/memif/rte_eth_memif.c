@@ -417,10 +417,6 @@ next_bulk:
 			m0->data_off = data_off;
 			m0->port = mq->in_port;
 			m0->ol_flags = 0;
-			m0->packet_type = 0;
-			m0->tx_offload = 0;
-			m0->vlan_tci = 0;
-			m0->vlan_tci_outer = 0;
 			rte_pktmbuf_data_len(m0) = len0;
 			rte_pktmbuf_pkt_len(m0) = len0;
 			rte_memcpy(rte_pktmbuf_mtod(m0, void *),
@@ -429,10 +425,6 @@ next_bulk:
 			m1->data_off = data_off;
 			m1->port = mq->in_port;
 			m1->ol_flags = 0;
-			m1->packet_type = 0;
-			m1->tx_offload = 0;
-			m1->vlan_tci = 0;
-			m1->vlan_tci_outer = 0;
 			rte_pktmbuf_data_len(m1) = len1;
 			rte_pktmbuf_pkt_len(m1) = len1;
 			rte_memcpy(rte_pktmbuf_mtod(m1, void *),
@@ -441,10 +433,6 @@ next_bulk:
 			m2->data_off = data_off;
 			m2->port = mq->in_port;
 			m2->ol_flags = 0;
-			m2->packet_type = 0;
-			m2->tx_offload = 0;
-			m2->vlan_tci = 0;
-			m2->vlan_tci_outer = 0;
 			rte_pktmbuf_data_len(m2) = len2;
 			rte_pktmbuf_pkt_len(m2) = len2;
 			rte_memcpy(rte_pktmbuf_mtod(m2, void *),
@@ -453,10 +441,6 @@ next_bulk:
 			m3->data_off = data_off;
 			m3->port = mq->in_port;
 			m3->ol_flags = 0;
-			m3->packet_type = 0;
-			m3->tx_offload = 0;
-			m3->vlan_tci = 0;
-			m3->vlan_tci_outer = 0;
 			rte_pktmbuf_data_len(m3) = len3;
 			rte_pktmbuf_pkt_len(m3) = len3;
 			rte_memcpy(rte_pktmbuf_mtod(m3, void *),
@@ -482,10 +466,6 @@ next_bulk:
 next_slot1:
 			mbuf->data_off = data_off;
 			mbuf->ol_flags = 0;
-			mbuf->packet_type = 0;
-			mbuf->tx_offload = 0;
-			mbuf->vlan_tci = 0;
-			mbuf->vlan_tci_outer = 0;
 			mbuf->port = mq->in_port;
 			s0 = cur_slot & mask;
 			d0 = &ring->desc[s0];
