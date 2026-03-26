@@ -36,16 +36,21 @@ rte_mov16(uint8_t *dst, const uint8_t *src)
 static inline void
 rte_mov32(uint8_t *dst, const uint8_t *src)
 {
-	vec_vsx_st(vec_vsx_ld(0, src), 0, dst);
-	vec_vsx_st(vec_vsx_ld(16, src), 16, dst);
+	__vector unsigned char v0 = vec_vsx_ld(0, src);
+	__vector unsigned char v1 = vec_vsx_ld(16, src);
+	vec_vsx_st(v0, 0, dst);
+	vec_vsx_st(v1, 16, dst);
 }
 
 static inline void
 rte_mov48(uint8_t *dst, const uint8_t *src)
 {
-	vec_vsx_st(vec_vsx_ld(0, src), 0, dst);
-	vec_vsx_st(vec_vsx_ld(16, src), 16, dst);
-	vec_vsx_st(vec_vsx_ld(32, src), 32, dst);
+	__vector unsigned char v0 = vec_vsx_ld(0, src);
+	__vector unsigned char v1 = vec_vsx_ld(16, src);
+	__vector unsigned char v2 = vec_vsx_ld(32, src);
+	vec_vsx_st(v0, 0, dst);
+	vec_vsx_st(v1, 16, dst);
+	vec_vsx_st(v2, 32, dst);
 }
 
 static inline void
