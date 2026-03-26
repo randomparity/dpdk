@@ -51,23 +51,39 @@ rte_mov48(uint8_t *dst, const uint8_t *src)
 static inline void
 rte_mov64(uint8_t *dst, const uint8_t *src)
 {
-	vec_vsx_st(vec_vsx_ld(0, src), 0, dst);
-	vec_vsx_st(vec_vsx_ld(16, src), 16, dst);
-	vec_vsx_st(vec_vsx_ld(32, src), 32, dst);
-	vec_vsx_st(vec_vsx_ld(48, src), 48, dst);
+	/* Load all 4 vectors first, then store — allows the CPU to
+	 * pipeline all loads before committing stores, reducing
+	 * store-buffer pressure on POWER9.
+	 */
+	__vector unsigned char v0 = vec_vsx_ld(0, src);
+	__vector unsigned char v1 = vec_vsx_ld(16, src);
+	__vector unsigned char v2 = vec_vsx_ld(32, src);
+	__vector unsigned char v3 = vec_vsx_ld(48, src);
+	vec_vsx_st(v0, 0, dst);
+	vec_vsx_st(v1, 16, dst);
+	vec_vsx_st(v2, 32, dst);
+	vec_vsx_st(v3, 48, dst);
 }
 
 static inline void
 rte_mov128(uint8_t *dst, const uint8_t *src)
 {
-	vec_vsx_st(vec_vsx_ld(0, src), 0, dst);
-	vec_vsx_st(vec_vsx_ld(16, src), 16, dst);
-	vec_vsx_st(vec_vsx_ld(32, src), 32, dst);
-	vec_vsx_st(vec_vsx_ld(48, src), 48, dst);
-	vec_vsx_st(vec_vsx_ld(64, src), 64, dst);
-	vec_vsx_st(vec_vsx_ld(80, src), 80, dst);
-	vec_vsx_st(vec_vsx_ld(96, src), 96, dst);
-	vec_vsx_st(vec_vsx_ld(112, src), 112, dst);
+	__vector unsigned char v0 = vec_vsx_ld(0, src);
+	__vector unsigned char v1 = vec_vsx_ld(16, src);
+	__vector unsigned char v2 = vec_vsx_ld(32, src);
+	__vector unsigned char v3 = vec_vsx_ld(48, src);
+	__vector unsigned char v4 = vec_vsx_ld(64, src);
+	__vector unsigned char v5 = vec_vsx_ld(80, src);
+	__vector unsigned char v6 = vec_vsx_ld(96, src);
+	__vector unsigned char v7 = vec_vsx_ld(112, src);
+	vec_vsx_st(v0, 0, dst);
+	vec_vsx_st(v1, 16, dst);
+	vec_vsx_st(v2, 32, dst);
+	vec_vsx_st(v3, 48, dst);
+	vec_vsx_st(v4, 64, dst);
+	vec_vsx_st(v5, 80, dst);
+	vec_vsx_st(v6, 96, dst);
+	vec_vsx_st(v7, 112, dst);
 }
 
 static inline void
