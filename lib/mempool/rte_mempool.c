@@ -112,6 +112,55 @@ arch_mem_object_align(unsigned int obj_size)
 		new_obj_size++;
 	return new_obj_size * RTE_MEMPOOL_ALIGN;
 }
+#elif defined(RTE_ARCH_PPC_64)
+/*
+ * POWER9 systems have 8 memory channels per socket (DDR4 buffered DIMMs).
+ * Spread objects across channels like x86 does, but with POWER9's 128-byte
+ * cache lines and typical 8-channel configuration.
+ */
+static unsigned get_gcd(unsigned a, unsigned b)
+{
+	unsigned c;
+
+	if (0 == a)
+		return b;
+	if (0 == b)
+		return a;
+
+	if (a < b) {
+		c = a;
+		a = b;
+		b = c;
+	}
+
+	while (b != 0) {
+		c = a % b;
+		a = b;
+		b = c;
+	}
+
+	return a;
+}
+
+static unsigned int
+arch_mem_object_align(unsigned int obj_size)
+{
+	unsigned nrank, nchan;
+	unsigned new_obj_size;
+
+	nchan = rte_memory_get_nchannel();
+	if (nchan == 0)
+		nchan = 8;
+
+	nrank = rte_memory_get_nrank();
+	if (nrank == 0)
+		nrank = 1;
+
+	new_obj_size = (obj_size + RTE_MEMPOOL_ALIGN_MASK) / RTE_MEMPOOL_ALIGN;
+	while (get_gcd(new_obj_size, nrank * nchan) != 1)
+		new_obj_size++;
+	return new_obj_size * RTE_MEMPOOL_ALIGN;
+}
 #else
 static unsigned int
 arch_mem_object_align(unsigned int obj_size)
