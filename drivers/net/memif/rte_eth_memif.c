@@ -409,26 +409,30 @@ next_bulk:
 			m2 = mbufs[rx_pkts + 2];
 			m3 = mbufs[rx_pkts + 3];
 
+			/* Interleave metadata writes with copies to keep
+			 * each mbuf's cache line hot during processing.
+			 */
 			m0->port = mq->in_port;
-			m1->port = mq->in_port;
-			m2->port = mq->in_port;
-			m3->port = mq->in_port;
-
 			rte_pktmbuf_data_len(m0) = len0;
 			rte_pktmbuf_pkt_len(m0) = len0;
-			rte_pktmbuf_data_len(m1) = len1;
-			rte_pktmbuf_pkt_len(m1) = len1;
-			rte_pktmbuf_data_len(m2) = len2;
-			rte_pktmbuf_pkt_len(m2) = len2;
-			rte_pktmbuf_data_len(m3) = len3;
-			rte_pktmbuf_pkt_len(m3) = len3;
-
 			rte_memcpy(rte_pktmbuf_mtod(m0, void *),
 				memif_get_buffer(proc_private, d0), len0);
+
+			m1->port = mq->in_port;
+			rte_pktmbuf_data_len(m1) = len1;
+			rte_pktmbuf_pkt_len(m1) = len1;
 			rte_memcpy(rte_pktmbuf_mtod(m1, void *),
 				memif_get_buffer(proc_private, d1), len1);
+
+			m2->port = mq->in_port;
+			rte_pktmbuf_data_len(m2) = len2;
+			rte_pktmbuf_pkt_len(m2) = len2;
 			rte_memcpy(rte_pktmbuf_mtod(m2, void *),
 				memif_get_buffer(proc_private, d2), len2);
+
+			m3->port = mq->in_port;
+			rte_pktmbuf_data_len(m3) = len3;
+			rte_pktmbuf_pkt_len(m3) = len3;
 			rte_memcpy(rte_pktmbuf_mtod(m3, void *),
 				memif_get_buffer(proc_private, d3), len3);
 
