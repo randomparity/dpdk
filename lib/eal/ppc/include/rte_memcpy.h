@@ -110,13 +110,13 @@ rte_memcpy_func(void *dst, const void *src, size_t n)
 	void *ret = dst;
 
 	/* Fast path for common 64-byte packet copy */
-	if (n == 64) {
+	if (__builtin_expect(n == 64, 1)) {
 		rte_mov64((uint8_t *)dst, (const uint8_t *)src);
 		return ret;
 	}
 
 	/* We can't copy < 16 bytes using XMM registers so do it manually. */
-	if (n < 16) {
+	if (__builtin_expect(n < 16, 0)) {
 		if (n & 0x01) {
 			*(uint8_t *)dst = *(const uint8_t *)src;
 			dst = (uint8_t *)dst + 1;
