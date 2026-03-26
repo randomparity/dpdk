@@ -114,6 +114,7 @@ struct pmd_internals {
 		uint8_t num_c2s_rings;		/**< number of client to server rings */
 		uint8_t num_s2c_rings;		/**< number of server to client rings */
 		uint16_t pkt_buffer_size;	/**< buffer size */
+		uint16_t pkt_buffer_stride;	/**< allocation stride (>= buffer size) */
 	} run;
 	/**< Parameters used in active connection */
 

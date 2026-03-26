@@ -1274,9 +1274,11 @@ memif_region_init_shm(struct rte_eth_dev *dev, uint8_t has_buffers)
 	    (1 << pmd->run.log2_ring_size));
 
 	r->region_size = r->pkt_buffer_offset;
-	/* if region has buffers, add buffers size to region_size */
+	/* if region has buffers, add buffers size to region_size.
+	 * Use stride (>= pkt_buffer_size) for memory channel spreading.
+	 */
 	if (has_buffers == 1)
-		r->region_size += (uint32_t)(pmd->run.pkt_buffer_size *
+		r->region_size += (uint32_t)(pmd->run.pkt_buffer_stride *
 			(1 << pmd->run.log2_ring_size) *
 			(pmd->run.num_c2s_rings +
 			 pmd->run.num_s2c_rings));
@@ -1379,7 +1381,7 @@ memif_init_rings(struct rte_eth_dev *dev)
 			ring->desc[j].region = 0;
 			ring->desc[j].offset =
 				proc_private->regions[0]->pkt_buffer_offset +
-				(uint32_t)(slot * pmd->run.pkt_buffer_size);
+				(uint32_t)(slot * pmd->run.pkt_buffer_stride);
 			ring->desc[j].length = pmd->run.pkt_buffer_size;
 		}
 	}
@@ -1400,7 +1402,7 @@ memif_init_rings(struct rte_eth_dev *dev)
 			ring->desc[j].region = 0;
 			ring->desc[j].offset =
 				proc_private->regions[0]->pkt_buffer_offset +
-				(uint32_t)(slot * pmd->run.pkt_buffer_size);
+				(uint32_t)(slot * pmd->run.pkt_buffer_stride);
 			ring->desc[j].length = pmd->run.pkt_buffer_size;
 		}
 	}

@@ -177,6 +177,24 @@ memif_msg_receive_hello(struct rte_eth_dev *dev, memif_msg_t *msg)
 					    pmd->cfg.log2_ring_size);
 	pmd->run.pkt_buffer_size = pmd->cfg.pkt_buffer_size;
 
+	/* Compute buffer stride: pad to spread buffers across memory channels.
+	 * Round up to next multiple of cache line that is coprime with
+	 * a typical channel count (4 for POWER9 Scale-Out).
+	 */
+	{
+		uint16_t stride = RTE_ALIGN_CEIL(pmd->run.pkt_buffer_size,
+						 RTE_CACHE_LINE_SIZE);
+		unsigned int stride_lines = stride / RTE_CACHE_LINE_SIZE;
+		/* Ensure stride (in cache lines) is odd — coprime with
+		 * any power-of-2 channel count (2, 4, 8, ...).
+		 */
+		if ((stride_lines & 1) == 0) {
+			stride_lines++;
+			stride = stride_lines * RTE_CACHE_LINE_SIZE;
+		}
+		pmd->run.pkt_buffer_stride = stride;
+	}
+
 	strlcpy(pmd->remote_name, (char *)h->name, sizeof(pmd->remote_name));
 
 	MIF_LOG(DEBUG, "Connecting to %s.", pmd->remote_name);
