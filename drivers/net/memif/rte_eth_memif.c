@@ -583,13 +583,17 @@ refill:
 		{
 			uint32_t buf_size = pmd->run.pkt_buffer_size;
 
-			while (n_slots >= 4) {
+			while (n_slots >= 8) {
 				ring->desc[head & mask].length = buf_size;
 				ring->desc[(head + 1) & mask].length = buf_size;
 				ring->desc[(head + 2) & mask].length = buf_size;
 				ring->desc[(head + 3) & mask].length = buf_size;
-				head += 4;
-				n_slots -= 4;
+				ring->desc[(head + 4) & mask].length = buf_size;
+				ring->desc[(head + 5) & mask].length = buf_size;
+				ring->desc[(head + 6) & mask].length = buf_size;
+				ring->desc[(head + 7) & mask].length = buf_size;
+				head += 8;
+				n_slots -= 8;
 			}
 			while (n_slots--) {
 				ring->desc[head & mask].length = buf_size;
