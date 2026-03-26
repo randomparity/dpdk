@@ -26,6 +26,7 @@
 #include <rte_errno.h>
 #include <rte_memory.h>
 #include <rte_memzone.h>
+#include <rte_prefetch.h>
 #include <rte_eal_memconfig.h>
 
 #include "rte_eth_memif.h"
@@ -399,15 +400,33 @@ next_bulk:
 				     MEMIF_DESC_FLAG_NEXT))
 				break;
 
+			/* prefetch next batch of descriptors */
+			if (n_slots >= 8) {
+				rte_prefetch0(&ring->desc[(cur_slot + 4) & mask]);
+				rte_prefetch0(&ring->desc[(cur_slot + 7) & mask]);
+			}
+
 			len0 = d0->length;
 			len1 = d1->length;
 			len2 = d2->length;
 			len3 = d3->length;
 
+			/* prefetch source buffers for current batch */
+			rte_prefetch0(memif_get_buffer(proc_private, d0));
+			rte_prefetch0(memif_get_buffer(proc_private, d1));
+			rte_prefetch0(memif_get_buffer(proc_private, d2));
+			rte_prefetch0(memif_get_buffer(proc_private, d3));
+
 			m0 = mbufs[rx_pkts + 0];
 			m1 = mbufs[rx_pkts + 1];
 			m2 = mbufs[rx_pkts + 2];
 			m3 = mbufs[rx_pkts + 3];
+
+			/* prefetch destination mbuf data areas */
+			rte_prefetch0(rte_pktmbuf_mtod(m0, void *));
+			rte_prefetch0(rte_pktmbuf_mtod(m1, void *));
+			rte_prefetch0(rte_pktmbuf_mtod(m2, void *));
+			rte_prefetch0(rte_pktmbuf_mtod(m3, void *));
 
 			m0->port = mq->in_port;
 			m1->port = mq->in_port;
