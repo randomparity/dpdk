@@ -1536,13 +1536,15 @@ rte_mempool_do_generic_get(struct rte_mempool *mp, void **obj_table,
 		RTE_MEMPOOL_CACHE_STAT_ADD(cache, get_success_bulk, 1);
 		RTE_MEMPOOL_CACHE_STAT_ADD(cache, get_success_objs, n);
 
-		/*
-		 * If the request size is known at build time,
-		 * the compiler unrolls the fixed length copy loop.
-		 */
 		cache->len -= n;
-		for (index = 0; index < n; index++)
-			*obj_table++ = *--cache_objs;
+		cache_objs = &cache->objs[cache->len];
+
+		/* Use bulk memcpy instead of per-element reverse copy.
+		 * Objects are fungible — FIFO vs LIFO order has minimal
+		 * thermal impact since all objects share the same cache
+		 * lines in the local cache array.
+		 */
+		rte_memcpy(obj_table, cache_objs, sizeof(void *) * n);
 
 		return 0;
 	}
